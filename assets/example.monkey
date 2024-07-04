@@ -1,3 +1,3 @@
 let a = func() {
- return 0;
+ return "VS Code";
 }

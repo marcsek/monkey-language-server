@@ -106,6 +106,35 @@ func handleMessage(
 			request.Params.Position,
 		)
 		writeResponse(writer, response)
+
+	case "textDocument/definition":
+		var request lsp.DefinitionRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			logger.Printf("Couldn't parse message (%s) in \"%s\"\n", err, method)
+		}
+		logger.Printf(
+			"Definition: %d %d %s",
+			request.Params.Position.Line,
+			request.Params.Position.Character,
+			request.Params.TextDocument.URI,
+		)
+
+		response := state.Definition(
+			request.ID,
+			request.Params.TextDocument.URI,
+			request.Params.Position,
+		)
+		writeResponse(writer, response)
+
+	case "textDocument/codeAction":
+		var request lsp.CodeActionRequest
+		if err := json.Unmarshal(contents, &request); err != nil {
+			logger.Printf("Couldn't parse message (%s) in \"%s\"\n", err, method)
+		}
+		logger.Printf("Code action: %s", request.Params.TextDocument.URI)
+
+		response := state.TextDocumentCodeAction(request.ID, request.Params.TextDocument.URI)
+		writeResponse(writer, response)
 	}
 }
 
