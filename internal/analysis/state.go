@@ -15,12 +15,16 @@ func NewState() *State {
 	return &State{Documents: map[string]string{}}
 }
 
-func (s *State) OpenDocument(uri, text string) {
+func (s *State) OpenDocument(uri, text string) []lsp.Diagnostic {
 	s.Documents[uri] = text
+
+	return getDiagnosticsForFile(text)
 }
 
-func (s *State) UpdateDocument(uri, text string) {
+func (s *State) UpdateDocument(uri, text string) []lsp.Diagnostic {
 	s.Documents[uri] = text
+
+	return getDiagnosticsForFile(text)
 }
 
 func (s *State) Hover(id int, uri string, position lsp.Position) lsp.HoverResponse {
@@ -59,6 +63,31 @@ func (s *State) Definition(id int, uri string, position lsp.Position) lsp.Defini
 	}
 
 	return response
+}
+
+func getDiagnosticsForFile(text string) []lsp.Diagnostic {
+	diagnostics := []lsp.Diagnostic{}
+	for row, line := range strings.Split(text, "\n") {
+		idx := strings.Index(line, "VS Code")
+		if idx >= 0 {
+			diagnostics = append(diagnostics, lsp.Diagnostic{
+				Range: lsp.Range{
+					Start: lsp.Position{
+						Line:      row,
+						Character: idx,
+					},
+					End: lsp.Position{
+						Line:      row,
+						Character: idx + len("VS Code"),
+					},
+				},
+				Severity: 1,
+				Source:   "The god him self",
+				Message:  "Fix this asap",
+			})
+		}
+	}
+	return diagnostics
 }
 
 func (s *State) TextDocumentCodeAction(id int, uri string) lsp.CodeActionResponse {
@@ -100,5 +129,28 @@ func (s *State) TextDocumentCodeAction(id int, uri string) lsp.CodeActionRespons
 			ID:  &id,
 		},
 		Result: actions,
+	}
+}
+
+func (s *State) TextDocumentCompletion(id int, uri string) lsp.CompletionResponse {
+	items := []lsp.CompletionItem{
+		{
+			Label:         "Nvim",
+			Detail:        "Ach jaj.",
+			Documentation: "Toto ma uz fakt boli.",
+		},
+		{
+			Label:         "VS Code",
+			Detail:        "Najviac.",
+			Documentation: "Fakt super hej fakt.",
+		},
+	}
+
+	return lsp.CompletionResponse{
+		Response: lsp.Response{
+			RPC: "2.0",
+			ID:  &id,
+		},
+		Result: items,
 	}
 }
