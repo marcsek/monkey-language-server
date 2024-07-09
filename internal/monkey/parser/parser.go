@@ -148,7 +148,11 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	}
 	p.nextToken()
 
-	stmt.Value = p.parseExpression(LOWEST)
+	value := p.parseExpression(LOWEST)
+	if value == nil {
+		return nil
+	}
+	stmt.Value = value
 
 	if fl, ok := stmt.Value.(*ast.FunctionLiteral); ok {
 		fl.Name = stmt.Name.Value
@@ -170,7 +174,11 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	p.nextToken()
 
-	stmt.ReturnValue = p.parseExpression(LOWEST)
+	returnValue := p.parseExpression(LOWEST)
+	if returnValue == nil {
+		return nil
+	}
+	stmt.ReturnValue = returnValue
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
@@ -187,7 +195,11 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	startPosition := p.curToken.Range.Start
 
-	stmt.Expression = p.parseExpression(LOWEST)
+	result := p.parseExpression(LOWEST)
+	if result == nil {
+		return nil
+	}
+	stmt.Expression = result
 
 	if p.peekTokenIs(token.SEMICOLON) {
 		p.nextToken()
@@ -211,6 +223,9 @@ func (p *Parser) parseExpression(presedence int) ast.Expression {
 		return nil
 	}
 	leftExp := prefix()
+	if leftExp == nil {
+		return nil
+	}
 
 	for !p.peekTokenIs(token.SEMICOLON) && presedence < p.peekPrecedence() {
 		infix := p.infixParseFns[p.peekToken.Type]
@@ -256,7 +271,11 @@ func (p *Parser) parsePrefixExpression() ast.Expression {
 
 	p.nextToken()
 
-	expression.Right = p.parseExpression(PREFIX)
+	exprRight := p.parseExpression(PREFIX)
+	if exprRight == nil {
+		return nil
+	}
+	expression.Right = exprRight
 
 	endPosition := expression.Right.Range().End
 	expression.RangeValue = token.Range{Start: startPosition, End: endPosition}
@@ -274,7 +293,11 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 
 	precedence := p.curPrecedence()
 	p.nextToken()
-	expression.Right = p.parseExpression(precedence)
+	exprRight := p.parseExpression(precedence)
+	if exprRight == nil {
+		return nil
+	}
+	expression.Right = exprRight
 
 	endPosition := expression.Right.Range().End
 	expression.RangeValue = token.Range{Start: startPosition, End: endPosition}
@@ -311,7 +334,11 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	}
 
 	p.nextToken()
-	expression.Condition = p.parseExpression(LOWEST)
+	result := p.parseExpression(LOWEST)
+	if result == nil {
+		return nil
+	}
+	expression.Condition = result
 
 	if !p.expectPeek(token.RPAREN) {
 		return nil
@@ -452,7 +479,11 @@ func (p *Parser) parseIndexExpression(left ast.Expression) ast.Expression {
 	startPosition := p.curToken.Range.Start
 
 	p.nextToken()
-	exp.Index = p.parseExpression(LOWEST)
+	result := p.parseExpression(LOWEST)
+	if result == nil {
+		return nil
+	}
+	exp.Index = result
 
 	if !p.expectPeek(token.RBRACKET) {
 		return nil
@@ -496,6 +527,9 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 	for !p.peekTokenIs(token.RBRACE) {
 		p.nextToken()
 		key := p.parseExpression(LOWEST)
+		if key == nil {
+			return nil
+		}
 
 		if !p.expectPeek(token.COLON) {
 			return nil
@@ -503,6 +537,9 @@ func (p *Parser) parseHashLiteral() ast.Expression {
 
 		p.nextToken()
 		value := p.parseExpression(LOWEST)
+		if value == nil {
+			return nil
+		}
 
 		hash.Pairs[key] = value
 
