@@ -121,12 +121,19 @@ func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
-		return p.parseLetStatement()
+		if res := p.parseLetStatement(); res != nil {
+			return res
+		}
 	case token.RETURN:
-		return p.parseReturnStatement()
+		if res := p.parseReturnStatement(); res != nil {
+			return res
+		}
 	default:
-		return p.parseExpressionStatement()
+		if res := p.parseExpressionStatement(); res != nil {
+			return res
+		}
 	}
+	return nil
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
