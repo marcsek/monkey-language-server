@@ -30,14 +30,14 @@ type SymbolTable struct {
 	FreeSymbols []Symbol
 }
 
-func NewSymbolTable() *SymbolTable {
+func NewSymbolTable(tableRange token.Range) *SymbolTable {
 	s := make(map[string]Symbol)
 	free := []Symbol{}
-	return &SymbolTable{store: s, FreeSymbols: free, depth: 0}
+	return &SymbolTable{store: s, FreeSymbols: free, depth: 0, tableRange: tableRange}
 }
 
-func NewEnclosedSymbolTable(outer *SymbolTable) *SymbolTable {
-	s := NewSymbolTable()
+func NewEnclosedSymbolTable(outer *SymbolTable, tableRange token.Range) *SymbolTable {
+	s := NewSymbolTable(tableRange)
 	s.depth = outer.depth + 1
 	s.Outer = outer
 	return s

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"time"
 
 	"github.com/marcsek/monkey-language-server/internal/lsp"
 	"github.com/marcsek/monkey-language-server/internal/lsp/CompletionItemKind"
@@ -12,33 +13,22 @@ import (
 	"github.com/marcsek/monkey-language-server/internal/monkey/token"
 )
 
-type relativeSymbolTable struct {
-	symbolTable *SymbolTable
-	outer       *relativeSymbolTable
-	tableRange  token.Range
-}
-
 type Compiler struct {
-	relativeSymbolTable *relativeSymbolTable
-	symbolTableMap      map[string]relativeSymbolTable
-	logger              *log.Logger
+	symbolTable    *SymbolTable
+	symbolTableMap map[string]*SymbolTable
+	logger         *log.Logger
 
 	scopeIndex int
 }
 
 func New(logger *log.Logger) *Compiler {
-	symbolTable := NewSymbolTable()
-
-	relativeST := &relativeSymbolTable{
-		symbolTable: symbolTable,
-		tableRange:  token.Range{},
-	}
-	symbolTableMap := map[string]relativeSymbolTable{}
+	symbolTable := NewSymbolTable(token.Range{})
+	symbolTableMap := make(map[string]*SymbolTable)
 
 	return &Compiler{
-		relativeSymbolTable: relativeST,
-		symbolTableMap:      symbolTableMap,
-		scopeIndex:          0,
+		symbolTable:    symbolTable,
+		symbolTableMap: symbolTableMap,
+		scopeIndex:     0,
 
 		logger: logger,
 	}
@@ -61,7 +51,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.LetStatement:
-		c.relativeSymbolTable.symbolTable.Define(node.Name.Value)
+		c.symbolTable.Define(node.Name.Value)
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
@@ -129,7 +119,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	case *ast.Identifier:
-		_, ok := c.relativeSymbolTable.symbolTable.Resolve(node.Value)
+		_, ok := c.symbolTable.Resolve(node.Value)
 		if !ok {
 			return fmt.Errorf("undefined variable %s", node.Value)
 		}
@@ -181,11 +171,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		defer c.leaveScope()
 
 		if node.Name != "" {
-			c.relativeSymbolTable.symbolTable.DefineFunctionName(node.Name)
+			c.symbolTable.DefineFunctionName(node.Name)
 		}
 
 		for _, p := range node.Parameters {
-			c.relativeSymbolTable.symbolTable.Define(p.Value)
+			c.symbolTable.Define(p.Value)
 		}
 
 		err := c.Compile(node.Body)
@@ -220,20 +210,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 }
 
 func (c *Compiler) enterScope(tableRange token.Range) {
-	newRelativeST := &relativeSymbolTable{
-		symbolTable: NewEnclosedSymbolTable(c.relativeSymbolTable.symbolTable),
-		tableRange:  tableRange,
-		outer:       c.relativeSymbolTable,
-	}
-	c.relativeSymbolTable = newRelativeST
+	c.symbolTable = NewEnclosedSymbolTable(c.symbolTable, tableRange)
+
 }
 
 func (c *Compiler) leaveScope() {
-	c.symbolTableMap[c.relativeSymbolTable.tableRange.String()] = *c.relativeSymbolTable
-	c.relativeSymbolTable = c.relativeSymbolTable.outer
+	c.symbolTableMap[c.symbolTable.tableRange.String()] = c.symbolTable
+	c.symbolTable = c.symbolTable.Outer
 }
 
 func (c *Compiler) Completion(position token.Position) []lsp.CompletionItem {
+	start := time.Now()
+
 	items := []lsp.CompletionItem{}
 
 	for _, name := range object.Constants {
@@ -261,17 +249,19 @@ func (c *Compiler) Completion(position token.Position) []lsp.CompletionItem {
 		)
 	}
 
+	c.logger.Printf("Completion took %s", time.Since(start))
+
 	return items
 }
 
 func (c *Compiler) findMostSpecificScope(position token.Position) *SymbolTable {
-	mostSpecific := c.relativeSymbolTable.symbolTable
-	depth := c.relativeSymbolTable.symbolTable.depth
+	mostSpecific := c.symbolTable
+	depth := c.symbolTable.depth
 
 	for _, symbol := range c.symbolTableMap {
 		if symbol.tableRange.Start.Line < position.Line &&
-			symbol.tableRange.End.Line > position.Line && depth < symbol.symbolTable.depth {
-			mostSpecific = symbol.symbolTable
+			symbol.tableRange.End.Line > position.Line && depth < symbol.depth {
+			mostSpecific = symbol
 			depth = mostSpecific.depth
 		}
 	}
