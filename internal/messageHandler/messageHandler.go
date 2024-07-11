@@ -104,8 +104,13 @@ func (mh *MessageHandler) HandleMessage(method string, contents []byte) {
 
 	case "textDocument/completion":
 		request := parseMessage[lsp.CompletionRequest](contents, mh.logger, method)
+		mh.logger.Println(request.Params.Position.Line)
 
-		response := mh.state.TextDocumentCompletion(request.ID, request.Params.TextDocument.URI)
+		response := mh.state.TextDocumentCompletion(
+			request.ID,
+			request.Params.Position,
+			request.Params.TextDocument.URI,
+		)
 		mh.sendMessage(response)
 	}
 }

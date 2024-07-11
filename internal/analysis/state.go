@@ -2,27 +2,70 @@ package analysis
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
 	"github.com/marcsek/monkey-language-server/internal/lsp"
+	"github.com/marcsek/monkey-language-server/internal/monkey/compiler"
+	"github.com/marcsek/monkey-language-server/internal/monkey/lexer"
+	"github.com/marcsek/monkey-language-server/internal/monkey/parser"
+	"github.com/marcsek/monkey-language-server/internal/monkey/token"
 )
 
 type State struct {
 	Documents map[string]string
+	Compiler  *compiler.Compiler
+	logger    *log.Logger
 }
 
-func NewState() *State {
-	return &State{Documents: map[string]string{}}
+func NewState(logger *log.Logger) *State {
+	return &State{Documents: map[string]string{}, logger: logger}
+}
+
+func (s *State) createCompiler(text string) *compiler.Compiler {
+	//constants := []object.Object{}
+	//globals := make([]object.Object, vm.GlobalsSize)
+
+	start := time.Now()
+
+	//for i, name := range object.Builtins {
+	//	symbolTable.DefineBuiltin(i, name)
+	//}
+
+	l := lexer.New(text)
+	p := parser.New(l)
+
+	program := p.ParseProgram()
+
+	if len(p.Errors()) != 0 {
+		s.logger.Printf("Parser Errors: %v", p.Errors())
+	}
+
+	comp := compiler.New(s.logger)
+
+	err := comp.Compile(program)
+	if err != nil {
+		s.logger.Printf("Compilation error: %s", err)
+	}
+	total := time.Since(start)
+
+	s.logger.Printf("Compile time: %s", total)
+	_ = program
+
+	return comp
 }
 
 func (s *State) OpenDocument(uri, text string) []lsp.Diagnostic {
 	s.Documents[uri] = text
+	s.Compiler = s.createCompiler(text)
 
 	return getDiagnosticsForFile(text)
 }
 
 func (s *State) UpdateDocument(uri, text string) []lsp.Diagnostic {
 	s.Documents[uri] = text
+	s.Compiler = s.createCompiler(text)
 
 	return getDiagnosticsForFile(text)
 }
@@ -132,19 +175,12 @@ func (s *State) TextDocumentCodeAction(id int, uri string) lsp.CodeActionRespons
 	}
 }
 
-func (s *State) TextDocumentCompletion(id int, uri string) lsp.CompletionResponse {
-	items := []lsp.CompletionItem{
-		{
-			Label:         "Nvim",
-			Detail:        "Ach jaj.",
-			Documentation: "Toto ma uz fakt boli.",
-		},
-		{
-			Label:         "VS Code",
-			Detail:        "Najviac.",
-			Documentation: "Fakt super hej fakt.",
-		},
-	}
+func (s *State) TextDocumentCompletion(
+	id int,
+	position lsp.Position,
+	uri string,
+) lsp.CompletionResponse {
+	items := s.Compiler.Completion(token.Position(position))
 
 	return lsp.CompletionResponse{
 		Response: lsp.Response{

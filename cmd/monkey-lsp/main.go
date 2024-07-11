@@ -22,7 +22,7 @@ func main() {
 	scanner := bufio.NewScanner(reader)
 	scanner.Split(rpc.SplicFunc)
 
-	state := analysis.NewState()
+	state := analysis.NewState(logger)
 
 	messageHandler := messageHandler.New(reader, writer, state, logger)
 
